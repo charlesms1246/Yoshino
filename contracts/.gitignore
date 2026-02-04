@@ -3,3 +3,6 @@ traces/*
 .trace
 .coverage*
 Pub.*.toml
+.env.deployment
+docs/*
+

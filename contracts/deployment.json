@@ -1,0 +1,40 @@
+{
+  "network": "testnet",
+  "deployed_at": "2026-02-05",
+  "transaction_digest": "pAmhNbCUqv7P4hSsvasQyeSPXqvUo9T2unzUPoQ53M8",
+  "deployer": "0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1",
+  "addresses": {
+    "package_id": "0xeea92ce741a215a0f35aed32e3c1ac7c3a002d069d043a23ad05e1d202687471",
+    "yoshino_state": "0xae74eb314281abfd5ffa21a9ead42c3f4c589f3bc1caffbfa1c2e52da8dd2cdf",
+    "admin_cap": "0x0999fd7a5ebfd325e5ac15f189487462ed877d4e4aa65789f6973d4ec722854e",
+    "solver_cap": "0xc8f475f3c859a70de94a74b22ec9ce29f825003501b025bb272d47a91939c3aa",
+    "upgrade_cap": "0xa1d697aa5541c44bbdb28f3f6d17b3b8e20d5c568b986a89f701a35d92bde5d4",
+    "balance_manager": "0xf43245d75ed4ce82b11223caac4eceb44003c96c12bf972a605a9eb39c6202fa"
+  },
+  "explorer_urls": {
+    "transaction": "https://testnet.suivision.xyz/txblock/pAmhNbCUqv7P4hSsvasQyeSPXqvUo9T2unzUPoQ53M8",
+    "package": "https://testnet.suivision.xyz/object/0xeea92ce741a215a0f35aed32e3c1ac7c3a002d069d043a23ad05e1d202687471",
+    "yoshino_state": "https://testnet.suivision.xyz/object/0xae74eb314281abfd5ffa21a9ead42c3f4c589f3bc1caffbfa1c2e52da8dd2cdf",
+    "admin_cap": "https://testnet.suivision.xyz/object/0x0999fd7a5ebfd325e5ac15f189487462ed877d4e4aa65789f6973d4ec722854e",
+    "solver_cap": "https://testnet.suivision.xyz/object/0xc8f475f3c859a70de94a74b22ec9ce29f825003501b025bb272d47a91939c3aa",
+    "upgrade_cap": "https://testnet.suivision.xyz/object/0xa1d697aa5541c44bbdb28f3f6d17b3b8e20d5c568b986a89f701a35d92bde5d4",
+    "balance_manager": "https://testnet.suivision.xyz/object/0xf43245d75ed4ce82b11223caac4eceb44003c96c12bf972a605a9eb39c6202fa"
+  },
+  "modules": [
+    "events",
+    "shielded_pool"
+  ],
+  "dependencies": {
+    "move_stdlib": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "sui_framework": "0x0000000000000000000000000000000000000000000000000000000000000002",
+    "deepbook_v3": "0x984757fc7c0e6dd5f15c2c66e881dd6e5aca98b725f3dbd83c445e057ebb790a",
+    "token_deep": "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8"
+  },
+  "gas_costs": {
+    "storage_cost": 25657600,
+    "computation_cost": 1090000,
+    "storage_rebate": 978120,
+    "non_refundable_fee": 9880,
+    "total_cost": 25769480
+  }
+}
