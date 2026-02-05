@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { CONFIG, validateConfig } from './config.js';
 import { suiClient } from './sui/client.js';
+import intentsApi from './api/intents.js';
 
 // Validate config on startup
 validateConfig();
@@ -44,13 +45,8 @@ app.get('/status', async (c) => {
   }
 });
 
-// Intent submission endpoint (placeholder)
-app.post('/api/intents/submit', async (c) => {
-  return c.json({
-    success: false,
-    error: 'Not implemented yet',
-  }, 501);
-});
+// Mount API routes
+app.route('/api/intents', intentsApi);
 
 // Start server
 const port = CONFIG.resolver.port;

@@ -47,7 +47,9 @@ SEAL_NETWORK_URL=https://seal-testnet.sui.io
 
 ## API Endpoints
 
-### `GET /`
+### Health & Status
+
+#### `GET /`
 Health check and service info.
 
 **Response:**
@@ -60,7 +62,9 @@ Health check and service info.
 }
 ```
 
-### `GET /status`
+---
+
+#### `GET /status`
 Verify SolverCap and configuration.
 
 **Response:**
@@ -75,8 +79,70 @@ Verify SolverCap and configuration.
 }
 ```
 
-### `POST /api/intents/submit`
-Submit encrypted intent (coming in Phase 2b).
+---
+
+### Intent Management (Phase 2b)
+
+#### `POST /api/intents/submit`
+Submit encrypted intent to queue.
+
+**Request Body:**
+```json
+{
+  "user": "0x...",
+  "encryptedData": "base64_encrypted_blob"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Intent queued for execution",
+    "queuePosition": 5
+  }
+}
+```
+
+---
+
+#### `GET /api/intents/queue`
+Get current queue status.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "pendingIntents": 7,
+    "nextExecution": 1738876543210,
+    "readyForBatch": false
+  }
+}
+```
+
+---
+
+#### `GET /api/intents/queue/details`
+Get detailed queue information (debugging).
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalIntents": 3,
+    "intents": [
+      {
+        "user": "0xabc...",
+        "status": "pending",
+        "createdAt": 1738876500000
+      }
+    ]
+  }
+}
+```
 
 ## Project Structure
 
@@ -89,9 +155,14 @@ backend/
 │   ├── sui/
 │   │   ├── client.ts     # Sui client wrapper
 │   │   └── client.test.ts
-│   ├── seal/             # Sui Seal integration (Phase 2b)
-│   ├── batch/            # Batch aggregation (Phase 2c)
-│   └── api/              # API routes (Phase 2d)
+│   ├── seal/             # Sui Seal integration (Phase 2b) ✅
+│   │   ├── client.ts     # Seal SDK wrapper
+│   │   └── client.test.ts
+│   ├── batch/            # Batch processing (Phase 2b) ✅
+│   │   ├── decoder.ts    # Intent decryption
+│   │   └── queue.ts      # Queue management
+│   └── api/              # API routes (Phase 2b) ✅
+│       └── intents.ts    # Intent endpoints
 ├── .env.example
 ├── tsconfig.json
 └── package.json
@@ -125,13 +196,16 @@ npm test -- --watch
 
 Tests require:
 - Running Sui localnet
-- Deployed contracts with valid SolverCap
-
-## Documentation
-
-- [PHASE_2A_COMPLETE.md](../PHASE_2A_COMPLETE.md) - Phase 2a details
+- DPHASE_2B_COMPLETE.md](../PHASE_2B_COMPLETE.md) - Phase 2b details
+- [STRUCTURE.md](STRUCTURE.md) - Backend architecture
 - [CONTEXT.md](../CONTEXT.md) - Full project context
 - [AGENTS.md](../AGENTS.md) - Agent hierarchy
+
+## Current Status
+
+**Phase 2a:** ✅ Complete  
+**Phase 2b:** ✅ Complete (Sui Seal integration)  
+**Phase 2c:** 🚧 Next (PTB construc
 
 ## Current Status
 
