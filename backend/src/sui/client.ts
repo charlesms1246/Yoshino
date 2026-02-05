@@ -39,6 +39,22 @@ export class YoshinoSuiClient {
     
     return result;
   }
+
+  /**
+   * Sign and execute transaction (alias for compatibility)
+   */
+  async signAndExecuteTransaction(tx: Transaction): Promise<SuiTransactionBlockResponse> {
+    return this.signAndExecute(tx);
+  }
+
+  /**
+   * Dry run transaction to estimate gas or validate
+   */
+  async dryRunTransaction(tx: Transaction) {
+    return this.client.dryRunTransactionBlock({
+      transactionBlock: await tx.build({ client: this.client }),
+    });
+  }
   
   async getObject(objectId: string) {
     return this.client.getObject({

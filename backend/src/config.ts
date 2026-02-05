@@ -9,6 +9,11 @@ export const CONFIG = {
     packageId: process.env.VAULT_BASE_PACKAGE_ID!,
     solverCapId: process.env.SOLVER_CAP_OBJECT_ID!,
     balanceManagerId: process.env.BALANCE_MANAGER_ID!,
+    vaultBaseId: process.env.VAULT_BASE_ID!,
+    vaultQuoteId: process.env.VAULT_QUOTE_ID!,
+    deepBookPoolId: process.env.DEEPBOOK_POOL_ID!,
+    baseAssetType: process.env.BASE_ASSET_TYPE || '0x2::sui::SUI',
+    quoteAssetType: process.env.QUOTE_ASSET_TYPE!,
   },
   resolver: {
     privateKey: process.env.RESOLVER_PRIVATE_KEY!,
@@ -16,6 +21,10 @@ export const CONFIG = {
   },
   seal: {
     networkUrl: process.env.SEAL_NETWORK_URL!,
+  },
+  batch: {
+    size: parseInt(process.env.BATCH_SIZE || '10'),
+    intervalMs: parseInt(process.env.BATCH_INTERVAL_MS || '5000'),
   },
 } as const;
 
@@ -26,6 +35,10 @@ export function validateConfig() {
     'VAULT_BASE_PACKAGE_ID',
     'SOLVER_CAP_OBJECT_ID',
     'RESOLVER_PRIVATE_KEY',
+    'VAULT_BASE_ID',
+    'VAULT_QUOTE_ID',
+    'DEEPBOOK_POOL_ID',
+    'QUOTE_ASSET_TYPE',
   ];
   
   for (const key of required) {

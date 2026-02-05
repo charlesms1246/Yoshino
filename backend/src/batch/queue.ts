@@ -1,21 +1,37 @@
 import { EncryptedIntent } from '../types.js';
+import { intentDecoder } from './decoder.js';
+import { batchExecutor } from './executor.js';
+import { CONFIG } from '../config.js';
 
 /**
- * Simple in-memory queue for encrypted intents
+ * In-memory queue for encrypted intents with automated batch execution
  * TODO: Replace with Redis or persistent storage in production
  */
 export class IntentQueue {
   private queue: EncryptedIntent[] = [];
-  private batchSize: number = 10;
-  private batchInterval: number = 5000; // 5 seconds
+  private batchSize: number = CONFIG.batch.size;
+  private batchInterval: number = CONFIG.batch.intervalMs;
   private nextExecutionTime: number = Date.now() + this.batchInterval;
+  private executing: boolean = false;
+  private batchLoopInterval?: NodeJS.Timeout;
+
+  constructor() {
+    // Start automatic batch execution loop
+    this.startBatchLoop();
+  }
   
   /**
    * Add encrypted intent to queue
+   * Triggers immediate execution if batch is full
    */
   async add(intent: EncryptedIntent): Promise<void> {
     this.queue.push(intent);
-    console.log(`Intent queued from ${intent.user}. Queue size: ${this.queue.length}`);
+    console.log(`📥 Intent queued from ${intent.user}. Queue size: ${this.queue.length}`);
+    
+    // Execute immediately if batch is full
+    if (this.queue.length >= this.batchSize && !this.executing) {
+      await this.executeBatch();
+    }
   }
   
   /**
@@ -67,6 +83,66 @@ export class IntentQueue {
    */
   clear(): void {
     this.queue = [];
+  }
+
+  /**
+   * Execute batch from queue
+   * Decrypts intents and executes on-chain
+   */
+  private async executeBatch(): Promise<void> {
+    if (this.executing || this.queue.length === 0) {
+      return;
+    }
+
+    this.executing = true;
+
+    try {
+      // Take batch from queue
+      const batch = this.queue.splice(0, this.batchSize);
+      console.log(`\n🔓 Processing batch of ${batch.length} intents...`);
+
+      // Decrypt all intents
+      const decryptedIntents = await intentDecoder.decryptBatch(batch);
+      console.log(`✅ Decrypted ${decryptedIntents.length} intents`);
+
+      // Execute on-chain
+      const result = await batchExecutor.executeBatch(decryptedIntents);
+      console.log(`✅ Batch executed: ${result.txDigest}`);
+      console.log(`   Total volume: ${result.totalVolume}`);
+      console.log(`   Executed at: ${new Date(result.executedAt).toISOString()}\n`);
+
+      // Update next execution time
+      this.nextExecutionTime = Date.now() + this.batchInterval;
+    } catch (error) {
+      console.error('❌ Batch execution failed:', error);
+      // Re-queue failed intents (optional, could implement retry logic)
+      // For now, they are discarded and need to be resubmitted
+    } finally {
+      this.executing = false;
+    }
+  }
+
+  /**
+   * Start periodic batch execution loop
+   */
+  private startBatchLoop(): void {
+    this.batchLoopInterval = setInterval(async () => {
+      if (this.isReadyForBatch()) {
+        await this.executeBatch();
+      }
+    }, this.batchInterval);
+
+    console.log(`⏰ Batch execution loop started (size: ${this.batchSize}, interval: ${this.batchInterval}ms)`);
+  }
+
+  /**
+   * Stop batch execution loop (for graceful shutdown)
+   */
+  stopBatchLoop(): void {
+    if (this.batchLoopInterval) {
+      clearInterval(this.batchLoopInterval);
+      console.log('⏸️  Batch execution loop stopped');
+    }
   }
 }
 
