@@ -1,24 +1,24 @@
 {
   "network": "testnet",
   "deployed_at": "2026-02-05",
-  "transaction_digest": "pAmhNbCUqv7P4hSsvasQyeSPXqvUo9T2unzUPoQ53M8",
+  "transaction_digest": "9HquWyFSeJB7cCfor3RoU851bEX37p9gPrWH4xRzBHto",
   "deployer": "0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1",
   "addresses": {
-    "package_id": "0xeea92ce741a215a0f35aed32e3c1ac7c3a002d069d043a23ad05e1d202687471",
-    "yoshino_state": "0xae74eb314281abfd5ffa21a9ead42c3f4c589f3bc1caffbfa1c2e52da8dd2cdf",
-    "admin_cap": "0x0999fd7a5ebfd325e5ac15f189487462ed877d4e4aa65789f6973d4ec722854e",
-    "solver_cap": "0xc8f475f3c859a70de94a74b22ec9ce29f825003501b025bb272d47a91939c3aa",
-    "upgrade_cap": "0xa1d697aa5541c44bbdb28f3f6d17b3b8e20d5c568b986a89f701a35d92bde5d4",
-    "balance_manager": "0xf43245d75ed4ce82b11223caac4eceb44003c96c12bf972a605a9eb39c6202fa"
+    "package_id": "0xea4d586ac0d5acd3a6a127d5acde57f7ba57f15a9fb1b0fde588b2f2da9655ef",
+    "yoshino_state": "0x78ab5d0ff249219beacdd81163613cc6dc0e20d6c0e987c3336856f0a003dc08",
+    "admin_cap": "0x1f168fce2f78551567e9d82f20568d6985454a91ccd07c314e8c3bbcf0de8d7d",
+    "solver_cap": "0xb7504d028188b766c5c057247e266e46aed22d6ba6bb26742a1aba5759102e6c",
+    "upgrade_cap": "0x3d00c243312712e34cceb01820f50ff1f272c1f892b560945bd51f271853554d",
+    "balance_manager": "0x86f9be144fb0c76d15c187c0db5cb97d9e08c722cddaa5d97923248c5b84740a"
   },
   "explorer_urls": {
-    "transaction": "https://testnet.suivision.xyz/txblock/pAmhNbCUqv7P4hSsvasQyeSPXqvUo9T2unzUPoQ53M8",
-    "package": "https://testnet.suivision.xyz/object/0xeea92ce741a215a0f35aed32e3c1ac7c3a002d069d043a23ad05e1d202687471",
-    "yoshino_state": "https://testnet.suivision.xyz/object/0xae74eb314281abfd5ffa21a9ead42c3f4c589f3bc1caffbfa1c2e52da8dd2cdf",
-    "admin_cap": "https://testnet.suivision.xyz/object/0x0999fd7a5ebfd325e5ac15f189487462ed877d4e4aa65789f6973d4ec722854e",
-    "solver_cap": "https://testnet.suivision.xyz/object/0xc8f475f3c859a70de94a74b22ec9ce29f825003501b025bb272d47a91939c3aa",
-    "upgrade_cap": "https://testnet.suivision.xyz/object/0xa1d697aa5541c44bbdb28f3f6d17b3b8e20d5c568b986a89f701a35d92bde5d4",
-    "balance_manager": "https://testnet.suivision.xyz/object/0xf43245d75ed4ce82b11223caac4eceb44003c96c12bf972a605a9eb39c6202fa"
+    "transaction": "https://testnet.suivision.xyz/txblock/9HquWyFSeJB7cCfor3RoU851bEX37p9gPrWH4xRzBHto",
+    "package": "https://testnet.suivision.xyz/object/0xea4d586ac0d5acd3a6a127d5acde57f7ba57f15a9fb1b0fde588b2f2da9655ef",
+    "yoshino_state": "https://testnet.suivision.xyz/object/0x78ab5d0ff249219beacdd81163613cc6dc0e20d6c0e987c3336856f0a003dc08",
+    "admin_cap": "https://testnet.suivision.xyz/object/0x1f168fce2f78551567e9d82f20568d6985454a91ccd07c314e8c3bbcf0de8d7d",
+    "solver_cap": "https://testnet.suivision.xyz/object/0xb7504d028188b766c5c057247e266e46aed22d6ba6bb26742a1aba5759102e6c",
+    "upgrade_cap": "https://testnet.suivision.xyz/object/0x3d00c243312712e34cceb01820f50ff1f272c1f892b560945bd51f271853554d",
+    "balance_manager": "https://testnet.suivision.xyz/object/0x86f9be144fb0c76d15c187c0db5cb97d9e08c722cddaa5d97923248c5b84740a"
   },
   "modules": [
     "events",

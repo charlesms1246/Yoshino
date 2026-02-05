@@ -43,5 +43,5 @@ deps = { Sui = "Sui_1" }
 [pinned.testnet.yoshino]
 source = { root = true }
 use_environment = "testnet"
-manifest_digest = "26B7CD450DBB762CEED8B9F17137DD8123D3CF73529FBD0EB13BE3B3AE94828F"
-deps = { Sui = "Sui", deepbook = "deepbook" }
+manifest_digest = "2CD6946CD2C3C8697B5A32FBFD9C831F0FD2246888A6882EABD870A283813B06"
+deps = { Sui = "Sui", deepbook = "deepbook", token = "token" }

@@ -1,7 +1,7 @@
 /// Module: shielded_pool
 /// 
 /// Core module for Yoshino - a privacy-focused DEX aggregator on Sui
-/// Acts as a "Passthrough Authority" for DeepBook V3 trading
+/// Implements the Internal Ledger model: Deposit → Trade → Withdraw
 module yoshino::shielded_pool {
     use sui::clock::{Self, Clock};
     use sui::coin::{Self, Coin};
@@ -17,9 +17,6 @@ module yoshino::shielded_pool {
     const ENotAuthorized: u64 = 0;
     /// Output amount is below minimum (slippage exceeded)
     const ESlippageExceeded: u64 = 1;
-    #[allow(unused_const)]
-    /// Interacting with wrong pool
-    const EInvalidPool: u64 = 2;
 
     // ======== Capability Objects ========
 
@@ -30,7 +27,7 @@ module yoshino::shielded_pool {
     }
 
     /// Solver capability - held by off-chain backend service
-    /// Required to call settle_batch
+    /// Required to call settle_batch and withdraw_to_user
     public struct SolverCap has key, store {
         id: UID,
     }
@@ -38,12 +35,10 @@ module yoshino::shielded_pool {
     // ======== State Objects ========
 
     /// Main protocol state (shared object)
-    /// Holds DeepBook Balance Manager and trading capabilities
+    /// Holds DeepBook Balance Manager - acts as the "Vault"
     public struct YoshinoState has key {
         id: UID,
-        /// ID of the DeepBook Balance Manager
-        balance_manager_id: ID,
-        /// Balance Manager object itself
+        /// Balance Manager object - holds all deposited funds
         balance_manager: BalanceManager,
         /// Sequential counter for batch IDs
         batch_count: u64,
@@ -64,14 +59,12 @@ module yoshino::shielded_pool {
             id: object::new(ctx),
         };
 
-        // 3. Create DeepBook Balance Manager for Yoshino
+        // 3. Create DeepBook Balance Manager (The Vault)
         let balance_manager = balance_manager::new(ctx);
-        let balance_manager_id = object::id(&balance_manager);
 
         // 4. Create and share protocol state
         let state = YoshinoState {
             id: object::new(ctx),
-            balance_manager_id,
             balance_manager,
             batch_count: 0,
         };
@@ -84,55 +77,83 @@ module yoshino::shielded_pool {
         transfer::share_object(state);
     }
 
-    // ======== Core Trading Functions ========
-
-    /// Execute a batch swap on DeepBook V3
-    /// 
-    /// This is the "hero" function that:
-    /// 1. Calls DeepBook's swap_exact_quantity function directly
-    /// 2. Verifies slippage protection
-    /// 3. Returns output coin to PTB for distribution
+    // =========================================================
+    // 1. DEPOSIT (User Action - Public but Generic)
+    // =========================================================
+    
+    /// Users deposit funds into the Yoshino vault
+    /// This is the "shielding" action - funds enter the pool
+    /// The Resolver observes this transaction off-chain and tracks user balances
     /// 
     /// # Type Parameters
-    /// - BaseAsset: The base asset of the pool (e.g., SUI)
-    /// - QuoteAsset: The quote asset of the pool (e.g., DBUSDC)
+    /// - T: The coin type to deposit (e.g., SUI, USDC)
+    /// 
+    /// # Arguments
+    /// - state: Yoshino protocol state
+    /// - input: The coin to deposit
+    public fun deposit<T>(
+        state: &mut YoshinoState,
+        input: Coin<T>,
+        ctx: &mut TxContext
+    ) {
+        // Deposit the coin into the BalanceManager vault
+        // The Resolver Agent observes this event and updates its private DB
+        balance_manager::deposit(&mut state.balance_manager, input, ctx);
+    }
+
+    // =========================================================
+    // 2. SETTLE BATCH (Resolver Action - The "Shielded" Trade)
+    // =========================================================
+    
+    /// Execute a batch swap on DeepBook V3 using funds from the vault
+    /// 
+    /// This is the privacy-preserving "hero" function that:
+    /// 1. Withdraws aggregated funds from the BalanceManager
+    /// 2. Executes the trade on DeepBook
+    /// 3. Deposits the output back into the BalanceManager
+    /// 
+    /// The public chain only sees "Yoshino traded X for Y" - not which users
+    /// 
+    /// # Type Parameters
+    /// - Base: The base asset of the pool (e.g., SUI)
+    /// - Quote: The quote asset of the pool (e.g., USDC)
     /// 
     /// # Arguments
     /// - _solver: Proof of authority (must hold SolverCap)
     /// - state: Yoshino protocol state
     /// - pool: DeepBook pool to trade on
     /// - clock: Sui clock for timestamps
-    /// - base_in: Base asset coins (set value to 0 if selling quote for base)
-    /// - quote_in: Quote asset coins (set value to 0 if selling base for quote)
-    /// - deep_in: DEEP tokens to pay trading fees
+    /// - amount_to_swap: Amount of input asset to swap
+    /// - is_bid: Trade direction (true = Buy Base with Quote, false = Sell Base for Quote)
     /// - min_out: Minimum output amount (slippage protection)
-    /// 
-    /// # Returns
-    /// - (Coin<BaseAsset>, Coin<QuoteAsset>, Coin<DEEP>): Output coins from the swap
-    public fun settle_batch<BaseAsset, QuoteAsset>(
+    public fun settle_batch<Base, Quote>(
         _solver: &SolverCap,
         state: &mut YoshinoState,
-        pool: &mut Pool<BaseAsset, QuoteAsset>,
+        pool: &mut Pool<Base, Quote>,
         clock: &Clock,
-        base_in: Coin<BaseAsset>,
-        quote_in: Coin<QuoteAsset>,
-        deep_in: Coin<DEEP>,
+        amount_to_swap: u64,
+        is_bid: bool,
         min_out: u64,
-        ctx: &mut TxContext,
-    ): (Coin<BaseAsset>, Coin<QuoteAsset>, Coin<DEEP>) {
+        ctx: &mut TxContext
+    ) {
         // Increment batch counter
         state.batch_count = state.batch_count + 1;
-        let batch_id = state.batch_count;
 
-        let base_value = coin::value(&base_in);
-        let quote_value = coin::value(&quote_in);
-        let pool_id = object::id(pool);
+        // A. Withdraw from Vault
+        // If is_bid (Buy Base), we need Quote to sell
+        // If !is_bid (Sell Base), we need Base to sell
+        let (base_in, quote_in) = if (is_bid) {
+            let coin_q = balance_manager::withdraw<Quote>(&mut state.balance_manager, amount_to_swap, ctx);
+            (coin::zero<Base>(ctx), coin_q)
+        } else {
+            let coin_b = balance_manager::withdraw<Base>(&mut state.balance_manager, amount_to_swap, ctx);
+            (coin_b, coin::zero<Quote>(ctx))
+        };
         
-        // Determine trade direction
-        let is_bid = quote_value > 0;
-        let input_amount = if (is_bid) { quote_value } else { base_value };
+        // Zero DEEP for now (fees handled separately or via BalanceManager trade cap)
+        let deep_in = coin::zero<DEEP>(ctx);
 
-        // Execute swap on DeepBook using swap_exact_quantity
+        // B. Execute Trade on DeepBook
         let (base_out, quote_out, deep_out) = pool::swap_exact_quantity(
             pool,
             base_in,
@@ -143,27 +164,59 @@ module yoshino::shielded_pool {
             ctx
         );
 
-        // Get output amounts
-        let base_out_value = coin::value(&base_out);
-        let quote_out_value = coin::value(&quote_out);
-        let output_amount = if (is_bid) { base_out_value } else { quote_out_value };
+        // Calculate output for event logging
+        let out_val = if (is_bid) { 
+            coin::value(&base_out) 
+        } else { 
+            coin::value(&quote_out) 
+        };
 
         // Verify slippage protection
-        assert!(output_amount >= min_out, ESlippageExceeded);
+        assert!(out_val >= min_out, ESlippageExceeded);
 
-        // Emit event
+        // C. Deposit Results back to Vault
+        balance_manager::deposit(&mut state.balance_manager, base_out, ctx);
+        balance_manager::deposit(&mut state.balance_manager, quote_out, ctx);
+        balance_manager::deposit(&mut state.balance_manager, deep_out, ctx);
+
+        // D. Emit event for off-chain indexing
         let timestamp = clock::timestamp_ms(clock);
         events::emit_batch_settled(
-            batch_id,
-            pool_id,
+            state.batch_count,
+            object::id(pool),
             is_bid,
-            input_amount,
-            output_amount,
+            amount_to_swap,
+            out_val,
             timestamp,
         );
+    }
 
-        // Return all coins to PTB for distribution
-        (base_out, quote_out, deep_out)
+    // =========================================================
+    // 3. WITHDRAW (Resolver Action - Settlement)
+    // =========================================================
+    
+    /// Withdraw funds from the vault to a user
+    /// 
+    /// The Resolver calls this function to settle trades and return funds to users
+    /// The Resolver's off-chain database tracks who should receive what
+    /// 
+    /// # Type Parameters
+    /// - T: The coin type to withdraw
+    /// 
+    /// # Arguments
+    /// - _solver: Proof of authority (must hold SolverCap)
+    /// - state: Yoshino protocol state
+    /// - amount: Amount to withdraw
+    /// - recipient: Address to receive the funds
+    public fun withdraw_to_user<T>(
+        _solver: &SolverCap,
+        state: &mut YoshinoState,
+        amount: u64,
+        recipient: address,
+        ctx: &mut TxContext
+    ) {
+        let out = balance_manager::withdraw<T>(&mut state.balance_manager, amount, ctx);
+        transfer::public_transfer(out, recipient);
     }
 
     // ======== Admin Functions ========
@@ -201,10 +254,10 @@ module yoshino::shielded_pool {
 
     /// Get the Balance Manager ID
     public fun get_balance_manager_id(state: &YoshinoState): ID {
-        state.balance_manager_id
+        object::id(&state.balance_manager)
     }
 
-    /// Get available balance in the Balance Manager  
+    /// Get available balance in the Balance Manager
     public fun get_balance<CoinType>(state: &YoshinoState): u64 {
         balance_manager::balance<CoinType>(&state.balance_manager)
     }
