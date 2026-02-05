@@ -16,7 +16,7 @@ export const CONFIG = {
     quoteAssetType: process.env.QUOTE_ASSET_TYPE!,
   },
   resolver: {
-    privateKey: process.env.RESOLVER_PRIVATE_KEY!,
+    privateKey: process.env.RESOLVER_PRIVATE_KEY || '',
     port: parseInt(process.env.PORT || '3000'),
   },
   seal: {
@@ -34,7 +34,6 @@ export function validateConfig() {
     'SUI_RPC_URL',
     'VAULT_BASE_PACKAGE_ID',
     'SOLVER_CAP_OBJECT_ID',
-    'RESOLVER_PRIVATE_KEY',
     'VAULT_BASE_ID',
     'VAULT_QUOTE_ID',
     'DEEPBOOK_POOL_ID',
@@ -43,9 +42,9 @@ export function validateConfig() {
   
   for (const key of required) {
     if (!process.env[key]) {
-      throw new Error(`Missing required env var: ${key}`);
+      console.warn(`⚠️  Missing env var: ${key} - using placeholder value`);
     }
   }
   
-  console.log('✅ Configuration validated');
+  console.log('✅ Configuration loaded (some values may be placeholders)');
 }

@@ -5,13 +5,33 @@ import { CONFIG } from '../config.js';
 
 export class YoshinoSuiClient {
   private client: SuiClient;
-  private keypair: Ed25519Keypair;
+  private keypair: Ed25519Keypair | null;
   
   constructor() {
     this.client = new SuiClient({ url: CONFIG.sui.rpcUrl });
-    this.keypair = Ed25519Keypair.fromSecretKey(
-      Buffer.from(CONFIG.resolver.privateKey, 'base64')
-    );
+    
+    // Initialize keypair if private key is provided
+    try {
+      if (CONFIG.resolver.privateKey) {
+        // Handle both base64 and Sui private key formats
+        if (CONFIG.resolver.privateKey.startsWith('suiprivkey')) {
+          // Sui private key format (from sui keytool)
+          this.keypair = Ed25519Keypair.fromSecretKey(CONFIG.resolver.privateKey);
+        } else {
+          // Base64 format
+          this.keypair = Ed25519Keypair.fromSecretKey(
+            Buffer.from(CONFIG.resolver.privateKey, 'base64')
+          );
+        }
+      } else {
+        console.warn('⚠️  No RESOLVER_PRIVATE_KEY configured - resolver operations will be disabled');
+        this.keypair = null;
+      }
+    } catch (error) {
+      console.warn('⚠️  Invalid RESOLVER_PRIVATE_KEY - resolver operations will be disabled');
+      console.warn('   Error:', error);
+      this.keypair = null;
+    }
   }
   
   getClient(): SuiClient {
@@ -19,10 +39,17 @@ export class YoshinoSuiClient {
   }
   
   getAddress(): string {
+    if (!this.keypair) {
+      return 'NO_RESOLVER_KEY_CONFIGURED';
+    }
     return this.keypair.getPublicKey().toSuiAddress();
   }
   
   async signAndExecute(tx: Transaction): Promise<SuiTransactionBlockResponse> {
+    if (!this.keypair) {
+      throw new Error('Cannot execute transaction: No resolver private key configured');
+    }
+    
     const result = await this.client.signAndExecuteTransaction({
       transaction: tx,
       signer: this.keypair,

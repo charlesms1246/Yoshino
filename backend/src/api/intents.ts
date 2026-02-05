@@ -52,13 +52,18 @@ app.post('/submit', async (c) => {
  * Get queue status
  */
 app.get('/queue', (c) => {
-  const response: ApiResponse = {
-    success: true,
-    data: {
-      pendingIntents: intentQueue.size(),
-      nextExecution: intentQueue.getNextExecutionTime(),
-      readyForBatch: intentQueue.isReadyForBatch(),
-    },
+  const allIntents = intentQueue.getAll();
+  
+  const response = {
+    pendingIntents: intentQueue.size(),
+    totalIntents: allIntents.length,
+    nextExecution: intentQueue.getNextExecutionTime(),
+    readyForBatch: intentQueue.isReadyForBatch(),
+    intents: allIntents.map(intent => ({
+      user: intent.user,
+      status: intent.status,
+      createdAt: intent.createdAt,
+    })),
   };
   
   return c.json(response);

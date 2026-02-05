@@ -54,7 +54,14 @@ console.log(`🚀 Resolver Agent starting on port ${port}`);
 console.log(`📍 Network: ${CONFIG.sui.network}`);
 console.log(`🔑 Resolver Address: ${suiClient.getAddress()}`);
 
-export default {
-  port,
+// For Node.js - use Hono's node adapter
+import { serve } from '@hono/node-server';
+
+serve({
   fetch: app.fetch,
-};
+  port,
+}, (info) => {
+  console.log(`✅ Server listening on http://localhost:${info.port}`);
+});
+
+export default app;
