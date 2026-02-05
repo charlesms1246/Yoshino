@@ -6,7 +6,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest"
+    "test": "vitest",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "hono": "^4.7.11",
