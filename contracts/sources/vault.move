@@ -9,6 +9,7 @@ module yoshino::vault {
     use sui::table::{Self, Table};
     use sui::event;
     use deepbook::balance_manager::{Self, BalanceManager};
+    use yoshino::intent::{Self, Intent};
 
     // ======== Error Codes ========
 
@@ -17,6 +18,7 @@ module yoshino::vault {
     const E_INSUFFICIENT_POOL_BALANCE: u64 = 3;
     const E_USER_NOT_FOUND: u64 = 4;
     const E_INSUFFICIENT_REPAYMENT: u64 = 5;
+    const E_NO_BALANCE: u64 = 6;
     const E_WRONG_BALANCE_MANAGER: u64 = 10;
     #[allow(unused_const)]
     const E_INSUFFICIENT_DEEPBOOK_BALANCE: u64 = 11;
@@ -72,6 +74,12 @@ module yoshino::vault {
     public struct RepayEvent has copy, drop {
         vault_id: ID,
         amount: u64,
+    }
+
+    public struct IntentSubmitted has copy, drop {
+        user: address,
+        intent_id: ID,
+        vault_id: ID,
     }
 
     // ======== Init Function ========
@@ -354,6 +362,46 @@ module yoshino::vault {
         });
         
         // 5. Promise is automatically destroyed (hot potato consumed)
+    }
+
+    // ======== Intent Submission ========
+
+    /// User submits an encrypted intent to the vault
+    /// Intent is stored on-chain, but content is encrypted via Sui Seal
+    /// Only SolverCap holder can decrypt the intent
+    /// 
+    /// # Arguments
+    /// * `vault` - Reference to the vault (verifies user has balance)
+    /// * `encrypted_data` - Encrypted intent data (blob)
+    /// * `ctx` - Transaction context
+    /// 
+    /// # Returns
+    /// * `Intent` - The created intent object
+    /// 
+    /// # Aborts
+    /// * `E_NO_BALANCE` - If user has no balance in the vault
+    public fun submit_intent<T>(
+        vault: &Vault<T>,
+        encrypted_data: vector<u8>,
+        ctx: &mut TxContext
+    ): Intent {
+        let user = tx_context::sender(ctx);
+        
+        // Verify user has balance in vault
+        // This ensures only depositors can submit intents
+        assert!(get_balance(vault, user) > 0, E_NO_BALANCE);
+        
+        // Create intent object
+        let intent = intent::create_intent(encrypted_data, ctx);
+        
+        // Emit event
+        event::emit(IntentSubmitted {
+            user,
+            intent_id: object::id(&intent),
+            vault_id: object::uid_to_inner(&vault.id),
+        });
+        
+        intent
     }
 
     // ======== Test-only Functions ========

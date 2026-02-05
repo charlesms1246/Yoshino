@@ -69,12 +69,12 @@ module yoshino::solver_cap_tests {
             let mut cap = ts::take_from_sender<SolverCap>(&scenario);
             
             // Simulate executing a batch
-            solver_cap::increment_batch_counter(&mut cap, 1000);
+            solver_cap::increment_batch_counter(&mut cap, 1000, ts::ctx(&mut scenario));
             assert!(solver_cap::get_batches_executed(&cap) == 1, 0);
             assert!(solver_cap::get_last_execution_ms(&cap) == 1000, 1);
             
             // Execute another batch
-            solver_cap::increment_batch_counter(&mut cap, 2000);
+            solver_cap::increment_batch_counter(&mut cap, 2000, ts::ctx(&mut scenario));
             assert!(solver_cap::get_batches_executed(&cap) == 2, 2);
             assert!(solver_cap::get_last_execution_ms(&cap) == 2000, 3);
             
@@ -243,7 +243,7 @@ module yoshino::solver_cap_tests {
             let mut i = 0;
             while (i < 5) {
                 let timestamp = 1000 + (i * 100);
-                solver_cap::increment_batch_counter(&mut cap, timestamp);
+                solver_cap::increment_batch_counter(&mut cap, timestamp, ts::ctx(&mut scenario));
                 i = i + 1;
             };
             
@@ -305,9 +305,9 @@ module yoshino::solver_cap_tests {
         ts::next_tx(&mut scenario, SOLVER);
         {
             let mut cap = ts::take_from_sender<SolverCap>(&scenario);
-            solver_cap::increment_batch_counter(&mut cap, 1000);
-            solver_cap::increment_batch_counter(&mut cap, 2000);
-            solver_cap::increment_batch_counter(&mut cap, 3000);
+            solver_cap::increment_batch_counter(&mut cap, 1000, ts::ctx(&mut scenario));
+            solver_cap::increment_batch_counter(&mut cap, 2000, ts::ctx(&mut scenario));
+            solver_cap::increment_batch_counter(&mut cap, 3000, ts::ctx(&mut scenario));
             ts::return_to_sender(&scenario, cap);
         };
         

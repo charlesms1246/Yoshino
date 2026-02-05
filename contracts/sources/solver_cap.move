@@ -142,7 +142,7 @@ module yoshino::solver_cap {
 
     /// Increment batch counter (called after successful execution)
     /// This records the execution and updates the timestamp
-    public fun increment_batch_counter(cap: &mut SolverCap, timestamp_ms: u64) {
+    public fun increment_batch_counter(cap: &mut SolverCap, timestamp_ms: u64, ctx: &TxContext) {
         cap.batches_executed = cap.batches_executed + 1;
         cap.last_execution_ms = timestamp_ms;
         
@@ -151,6 +151,14 @@ module yoshino::solver_cap {
             batch_number: cap.batches_executed,
             timestamp_ms,
         });
+    }
+
+    // ======== Timestamp Tracking Functions ========
+
+    /// Update the last execution timestamp
+    /// Called during decryption or batch execution
+    public fun update_last_execution(cap: &mut SolverCap, timestamp_ms: u64) {
+        cap.last_execution_ms = timestamp_ms;
     }
 
     // ======== Transfer Functions ========
