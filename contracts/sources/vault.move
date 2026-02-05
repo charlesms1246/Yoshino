@@ -9,7 +9,8 @@ module yoshino::vault {
     use sui::table::{Self, Table};
     use sui::event;
     use deepbook::balance_manager::{Self, BalanceManager};
-    use yoshino::intent::{Self, Intent};
+    use yoshino::intent::{Self, Intent, Trade};
+    use yoshino::solver_cap::{Self, SolverCap};
 
     // ======== Error Codes ========
 
@@ -80,6 +81,14 @@ module yoshino::vault {
         user: address,
         intent_id: ID,
         vault_id: ID,
+    }
+
+    public struct BatchExecuted has copy, drop {
+        vault_id: ID,
+        num_trades: u64,
+        net_amount: u64,
+        total_bid: u64,
+        total_ask: u64,
     }
 
     // ======== Init Function ========
@@ -231,6 +240,37 @@ module yoshino::vault {
         object::id(balance_manager) == vault.balance_manager_id
     }
 
+    // ======== Internal Ledger Manipulation ========
+
+    /// Deduct from user's internal balance
+    /// This is used during batch execution when user's assets are traded
+    public(package) fun deduct_balance<T>(
+        vault: &mut Vault<T>,
+        user: address,
+        amount: u64
+    ) {
+        assert!(table::contains(&vault.ledger, user), E_USER_NOT_FOUND);
+        let user_balance = table::borrow_mut(&mut vault.ledger, user);
+        assert!(*user_balance >= amount, E_INSUFFICIENT_BALANCE);
+        *user_balance = *user_balance - amount;
+    }
+
+    /// Credit to user's internal balance
+    /// This is used during batch execution when user receives assets from trade
+    public(package) fun credit_balance<T>(
+        vault: &mut Vault<T>,
+        user: address,
+        amount: u64
+    ) {
+        if (!table::contains(&vault.ledger, user)) {
+            table::add(&mut vault.ledger, user, amount);
+            vault.user_count = vault.user_count + 1;
+        } else {
+            let user_balance = table::borrow_mut(&mut vault.ledger, user);
+            *user_balance = *user_balance + amount;
+        };
+    }
+
     // ======== DeepBook Integration ========
 
     /// Move funds from vault pool to DeepBook BalanceManager
@@ -362,6 +402,136 @@ module yoshino::vault {
         });
         
         // 5. Promise is automatically destroyed (hot potato consumed)
+    }
+
+    // ======== Batch Execution ========
+
+    /// Execute a batch of trades atomically
+    /// This is the core function that aggregates multiple user intents and executes them
+    /// Uses hot potato pattern to ensure funds are returned
+    /// 
+    /// # Arguments
+    /// * `solver_cap` - Solver capability for authorization
+    /// * `vault` - The vault holding user funds  
+    /// * `trades` - Vector of decoded trades (after Seal decryption)
+    /// * `ctx` - Transaction context
+    /// 
+    /// # Returns
+    /// * `u64` - Net amount traded
+    /// 
+    /// # Example Flow
+    /// 1. User A wants to buy 100 SUI for USDC (bid)
+    /// 2. User B wants to sell 80 SUI for USDC (ask)
+    /// 3. Net: 20 SUI buy order
+    /// 4. Vault borrows 20 USDC, trades on DeepBook, repays vault
+    /// 5. User ledgers updated: A gets SUI, B gets USDC
+    public fun execute_batch<T>(
+        solver_cap: &mut SolverCap,
+        vault: &mut Vault<T>,
+        trades: vector<Trade>,
+        ctx: &mut TxContext
+    ): u64 {
+        // 1. Verify authorization
+        assert!(solver_cap::verify_solver_cap(solver_cap), E_VAULT_MISMATCH);
+        
+        // 2. Aggregate trades to determine net position
+        let (total_bid, total_ask) = aggregate_trades(&trades);
+        
+        // 3. Calculate net amount to trade
+        let net_amount = if (total_bid > total_ask) {
+            total_bid - total_ask
+        } else if (total_ask > total_bid) {
+            total_ask - total_bid
+        } else {
+            0  // Perfect match, no external trade needed
+        };
+        
+        // 4. If we need to trade externally
+        if (net_amount > 0) {
+            // Borrow funds using hot potato pattern
+            let (borrowed_coin, promise) = borrow(vault, net_amount, ctx);
+            
+            // NOTE: In production, here you would:
+            // - Fund BalanceManager
+            // - Execute trade on DeepBook
+            // - Withdraw proceeds
+            // 
+            // For this educational implementation, we simulate perfect execution
+            // where we get back exactly what we borrowed (zero slippage)
+            
+            // Repay vault (hot potato requires this)
+            repay(vault, borrowed_coin, promise);
+        };
+        
+        // 5. Update user ledgers based on their trades
+        update_ledgers(vault, trades);
+        
+        // 6. Emit batch execution event
+        event::emit(BatchExecuted {
+            vault_id: object::uid_to_inner(&vault.id),
+            num_trades: vector::length(&trades),
+            net_amount,
+            total_bid,
+            total_ask,
+        });
+        
+        // 7. Increment solver cap counter
+        // Using epoch timestamp as a placeholder since we don't have Clock here
+        let timestamp = tx_context::epoch_timestamp_ms(ctx);
+        solver_cap::increment_batch_counter(solver_cap, timestamp, ctx);
+        
+        net_amount
+    }
+
+    /// Aggregate trades to calculate total bids and asks
+    fun aggregate_trades(trades: &vector<Trade>): (u64, u64) {
+        let mut total_bid = 0;
+        let mut total_ask = 0;
+        let mut i = 0;
+        let len = vector::length(trades);
+        
+        while (i < len) {
+            let trade = vector::borrow(trades, i);
+            if (intent::get_trade_is_bid(trade)) {
+                total_bid = total_bid + intent::get_trade_amount(trade);
+            } else {
+                total_ask = total_ask + intent::get_trade_amount(trade);
+            };
+            i = i + 1;
+        };
+        
+        (total_bid, total_ask)
+    }
+
+    /// Update user ledgers after batch execution
+    /// Deducts from sellers, credits to buyers
+    fun update_ledgers<T>(
+        vault: &mut Vault<T>,
+        trades: vector<Trade>
+    ) {
+        let mut i = 0;
+        let len = vector::length(&trades);
+        
+        while (i < len) {
+            let trade = vector::borrow(&trades, i);
+            let user = intent::get_trade_user(trade);
+            let amount = intent::get_trade_amount(trade);
+            let is_bid = intent::get_trade_is_bid(trade);
+            
+            if (is_bid) {
+                // Buyer: deduct quote asset, credit base asset
+                // In this simplified version, we just update the balance
+                // In production, this would involve actual asset swaps
+                deduct_balance(vault, user, amount);
+                credit_balance(vault, user, amount);
+            } else {
+                // Seller: deduct base asset, credit quote asset  
+                deduct_balance(vault, user, amount);
+                credit_balance(vault, user, amount);
+            };
+            
+            i = i + 1;
+        };
     }
 
     // ======== Intent Submission ========

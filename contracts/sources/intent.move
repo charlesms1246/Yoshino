@@ -23,6 +23,19 @@ module yoshino::intent {
 
     // ======== Structs ========
 
+    /// Decoded intent data (after decryption by Resolver)
+    /// This represents the actual trading instruction once decrypted
+    public struct Trade has drop, copy {
+        /// User who submitted this trade
+        user: address,
+        /// Amount to trade
+        amount: u64,
+        /// true = buy (bid), false = sell (ask)
+        is_bid: bool,
+        /// Minimum acceptable price (for slippage protection)
+        min_price: u64,
+    }
+
     /// Represents a user's trading intent (encrypted on-chain)
     /// The encrypted_data field contains the actual trading instructions
     /// which can only be decrypted by a SolverCap holder via Sui Seal
@@ -226,6 +239,29 @@ module yoshino::intent {
     public fun is_cancelled(intent: &Intent): bool {
         intent.status == STATUS_CANCELLED
     }
+
+    // ======== Trade Construction Functions ========
+
+    /// Create a Trade struct (used by Resolver after decryption)
+    public fun create_trade(
+        user: address,
+        amount: u64,
+        is_bid: bool,
+        min_price: u64
+    ): Trade {
+        Trade {
+            user,
+            amount,
+            is_bid,
+            min_price,
+        }
+    }
+
+    /// Get trade details
+    public fun get_trade_user(trade: &Trade): address { trade.user }
+    public fun get_trade_amount(trade: &Trade): u64 { trade.amount }
+    public fun get_trade_is_bid(trade: &Trade): bool { trade.is_bid }
+    public fun get_trade_min_price(trade: &Trade): u64 { trade.min_price }
 
     // ======== Test-only Functions ========
 
