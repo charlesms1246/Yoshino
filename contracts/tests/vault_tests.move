@@ -4,6 +4,7 @@ module yoshino::vault_tests {
     use sui::coin::{Self};
     use sui::sui::SUI;
     use yoshino::vault::{Self, Vault, AdminCap};
+    use deepbook::balance_manager::BalanceManager;
 
     const ADMIN: address = @0xAD;
     const USER1: address = @0x1;
@@ -389,4 +390,208 @@ module yoshino::vault_tests {
         
         ts::end(scenario);
     }
+
+    // ======== DeepBook Integration Tests ========
+
+    #[test]
+    /// Test that vault creates BalanceManager correctly
+    fun test_balance_manager_creation() {
+        let mut scenario = ts::begin(ADMIN);
+        
+        // Initialize module
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            vault::test_init(ts::ctx(&mut scenario));
+        };
+        
+        // Create vault - should also create BalanceManager
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
+            vault::create_vault<SUI>(&admin_cap, ts::ctx(&mut scenario));
+            ts::return_to_sender(&scenario, admin_cap);
+        };
+        
+        // Verify BalanceManager was created and is shared
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let bm = ts::take_shared<BalanceManager>(&scenario);
+            
+            // Verify the BalanceManager ID matches
+            assert!(vault::get_balance_manager_id(&vault) == object::id(&bm), 0);
+            assert!(vault::verify_balance_manager(&vault, &bm), 1);
+            
+            ts::return_shared(vault);
+            ts::return_shared(bm);
+        };
+        
+        ts::end(scenario);
+    }
+
+    #[test]
+    /// Test funding BalanceManager from vault
+    fun test_fund_balance_manager() {
+        let mut scenario = ts::begin(ADMIN);
+        setup_vault(&mut scenario);
+        
+        // User deposits to vault
+        ts::next_tx(&mut scenario, USER1);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let coin = coin::mint_for_testing<SUI>(1000, ts::ctx(&mut scenario));
+            vault::deposit(&mut vault, coin, ts::ctx(&mut scenario));
+            ts::return_shared(vault);
+        };
+        
+        // Fund BalanceManager from vault pool
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let mut bm = ts::take_shared<BalanceManager>(&scenario);
+            
+            let pool_before = vault::get_pool_balance(&vault);
+            
+            // Move 500 from vault to BalanceManager
+            vault::fund_balance_manager(&mut vault, &mut bm, 500, ts::ctx(&mut scenario));
+            
+            // Verify pool decreased
+            assert!(vault::get_pool_balance(&vault) == pool_before - 500, 0);
+            assert!(vault::get_pool_balance(&vault) == 500, 1);
+            
+            ts::return_shared(vault);
+            ts::return_shared(bm);
+        };
+        
+        ts::end(scenario);
+    }
+
+    #[test]
+    /// Test withdrawing from BalanceManager back to vault
+    fun test_withdraw_from_balance_manager() {
+        let mut scenario = ts::begin(ADMIN);
+        setup_vault(&mut scenario);
+        
+        // Setup: deposit and fund BalanceManager
+        ts::next_tx(&mut scenario, USER1);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let coin = coin::mint_for_testing<SUI>(1000, ts::ctx(&mut scenario));
+            vault::deposit(&mut vault, coin, ts::ctx(&mut scenario));
+            ts::return_shared(vault);
+        };
+        
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let mut bm = ts::take_shared<BalanceManager>(&scenario);
+            vault::fund_balance_manager(&mut vault, &mut bm, 500, ts::ctx(&mut scenario));
+            ts::return_shared(vault);
+            ts::return_shared(bm);
+        };
+        
+        // Withdraw back from BalanceManager to vault
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let mut bm = ts::take_shared<BalanceManager>(&scenario);
+            
+            let pool_before = vault::get_pool_balance(&vault);
+            
+            // Move 300 from BalanceManager back to vault
+            vault::withdraw_from_balance_manager(&mut vault, &mut bm, 300, ts::ctx(&mut scenario));
+            
+            // Verify pool increased
+            assert!(vault::get_pool_balance(&vault) == pool_before + 300, 0);
+            assert!(vault::get_pool_balance(&vault) == 800, 1);
+            
+            ts::return_shared(vault);
+            ts::return_shared(bm);
+        };
+        
+        ts::end(scenario);
+    }
+
+    #[test]
+    /// Test round-trip: fund BalanceManager and withdraw back
+    fun test_balance_manager_round_trip() {
+        let mut scenario = ts::begin(ADMIN);
+        setup_vault(&mut scenario);
+        
+        // Deposit initial funds
+        ts::next_tx(&mut scenario, USER1);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let coin = coin::mint_for_testing<SUI>(1000, ts::ctx(&mut scenario));
+            vault::deposit(&mut vault, coin, ts::ctx(&mut scenario));
+            ts::return_shared(vault);
+        };
+        
+        // Round trip: fund and withdraw same amount
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let mut bm = ts::take_shared<BalanceManager>(&scenario);
+            
+            let initial_pool = vault::get_pool_balance(&vault);
+            
+            // Fund BalanceManager
+            vault::fund_balance_manager(&mut vault, &mut bm, 400, ts::ctx(&mut scenario));
+            assert!(vault::get_pool_balance(&vault) == initial_pool - 400, 0);
+            
+            // Withdraw back
+            vault::withdraw_from_balance_manager(&mut vault, &mut bm, 400, ts::ctx(&mut scenario));
+            assert!(vault::get_pool_balance(&vault) == initial_pool, 1);
+            
+            ts::return_shared(vault);
+            ts::return_shared(bm);
+        };
+        
+        ts::end(scenario);
+    }
+
+    #[test]
+    /// Test prepare_for_trade and finalize_trade functions
+    fun test_trade_preparation() {
+        let mut scenario = ts::begin(ADMIN);
+        setup_vault(&mut scenario);
+        
+        // Deposit funds
+        ts::next_tx(&mut scenario, USER1);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let coin = coin::mint_for_testing<SUI>(1000, ts::ctx(&mut scenario));
+            vault::deposit(&mut vault, coin, ts::ctx(&mut scenario));
+            ts::return_shared(vault);
+        };
+        
+        // Prepare for trade
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let mut bm = ts::take_shared<BalanceManager>(&scenario);
+            
+            vault::prepare_for_trade(&mut vault, &mut bm, 500, ts::ctx(&mut scenario));
+            assert!(vault::get_pool_balance(&vault) == 500, 0);
+            
+            ts::return_shared(vault);
+            ts::return_shared(bm);
+        };
+        
+        // Finalize trade (return funds)
+        ts::next_tx(&mut scenario, ADMIN);
+        {
+            let mut vault = ts::take_shared<Vault<SUI>>(&scenario);
+            let mut bm = ts::take_shared<BalanceManager>(&scenario);
+            
+            vault::finalize_trade(&mut vault, &mut bm, 300, ts::ctx(&mut scenario));
+            assert!(vault::get_pool_balance(&vault) == 800, 1);
+            
+            ts::return_shared(vault);
+            ts::return_shared(bm);
+        };
+        
+        ts::end(scenario);
+    }
 }
+

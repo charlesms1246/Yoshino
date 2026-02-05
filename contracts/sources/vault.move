@@ -8,6 +8,7 @@ module yoshino::vault {
     use sui::balance::{Self, Balance};
     use sui::table::{Self, Table};
     use sui::event;
+    use deepbook::balance_manager::{Self, BalanceManager};
 
     // ======== Error Codes ========
 
@@ -16,6 +17,11 @@ module yoshino::vault {
     const E_INSUFFICIENT_POOL_BALANCE: u64 = 3;
     const E_USER_NOT_FOUND: u64 = 4;
     const E_INSUFFICIENT_REPAYMENT: u64 = 5;
+    const E_WRONG_BALANCE_MANAGER: u64 = 10;
+    #[allow(unused_const)]
+    const E_INSUFFICIENT_DEEPBOOK_BALANCE: u64 = 11;
+    #[allow(unused_const)]
+    const E_TRADE_FAILED: u64 = 12;
 
     // ======== Structs ========
 
@@ -26,6 +32,8 @@ module yoshino::vault {
         pool: Balance<T>,
         /// Internal ledger: user address -> their balance
         ledger: Table<address, u64>,
+        /// DeepBook BalanceManager ID for trading
+        balance_manager_id: ID,
         /// Total users in the vault
         user_count: u64,
     }
@@ -81,16 +89,24 @@ module yoshino::vault {
 
     // ======== Vault Management ========
 
-    /// Create a new vault for a specific coin type
+    /// Create a new vault for a specific coin type with BalanceManager
     /// Only the AdminCap holder can create vaults
     public fun create_vault<T>(
         _admin: &AdminCap,
         ctx: &mut TxContext
     ) {
+        // Create DeepBook BalanceManager for this vault
+        let balance_manager = balance_manager::new(ctx);
+        let bm_id = object::id(&balance_manager);
+        
+        // Share the BalanceManager
+        transfer::public_share_object(balance_manager);
+        
         let vault = Vault<T> {
             id: object::new(ctx),
             pool: balance::zero<T>(),
             ledger: table::new(ctx),
+            balance_manager_id: bm_id,
             user_count: 0,
         };
         // Share the vault object for concurrent access
@@ -192,6 +208,90 @@ module yoshino::vault {
         vault: &Vault<T>
     ): u64 {
         vault.user_count
+    }
+
+    /// Get the BalanceManager ID for this vault
+    public fun get_balance_manager_id<T>(vault: &Vault<T>): ID {
+        vault.balance_manager_id
+    }
+
+    /// Check if a BalanceManager belongs to this vault
+    public fun verify_balance_manager<T>(
+        vault: &Vault<T>,
+        balance_manager: &BalanceManager
+    ): bool {
+        object::id(balance_manager) == vault.balance_manager_id
+    }
+
+    // ======== DeepBook Integration ========
+
+    /// Move funds from vault pool to DeepBook BalanceManager
+    /// This prepares funds for trading on DeepBook
+    public fun fund_balance_manager<T>(
+        vault: &mut Vault<T>,
+        balance_manager: &mut BalanceManager,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        // 1. Verify balance_manager ID matches vault's stored ID
+        assert!(object::id(balance_manager) == vault.balance_manager_id, E_WRONG_BALANCE_MANAGER);
+        
+        // 2. Take coins from vault pool
+        let withdrawn_balance = balance::split(&mut vault.pool, amount);
+        let coin = coin::from_balance(withdrawn_balance, ctx);
+        
+        // 3. Deposit to BalanceManager
+        balance_manager::deposit(balance_manager, coin, ctx);
+    }
+
+    /// Move funds from DeepBook BalanceManager back to vault pool
+    /// This returns traded funds back to the vault
+    public fun withdraw_from_balance_manager<T>(
+        vault: &mut Vault<T>,
+        balance_manager: &mut BalanceManager,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        // 1. Verify balance_manager ID matches
+        assert!(object::id(balance_manager) == vault.balance_manager_id, E_WRONG_BALANCE_MANAGER);
+        
+        // 2. Withdraw from BalanceManager
+        let coin = balance_manager::withdraw<T>(balance_manager, amount, ctx);
+        
+        // 3. Add back to vault pool
+        balance::join(&mut vault.pool, coin::into_balance(coin));
+    }
+
+    /// Prepare funds for DeepBook trading
+    /// This function moves funds to BalanceManager where they can be traded
+    /// The actual trading logic should use DeepBook's pool functions directly
+    /// with the BalanceManager that belongs to this vault
+    public fun prepare_for_trade<T>(
+        vault: &mut Vault<T>,
+        balance_manager: &mut BalanceManager,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        // Verify correct BalanceManager
+        assert!(object::id(balance_manager) == vault.balance_manager_id, E_WRONG_BALANCE_MANAGER);
+        
+        // Move funds from vault to BalanceManager for trading
+        fund_balance_manager(vault, balance_manager, amount, ctx);
+    }
+
+    /// Return funds after DeepBook trading
+    /// This function moves funds back from BalanceManager to vault
+    public fun finalize_trade<T>(
+        vault: &mut Vault<T>,
+        balance_manager: &mut BalanceManager,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        // Verify correct BalanceManager
+        assert!(object::id(balance_manager) == vault.balance_manager_id, E_WRONG_BALANCE_MANAGER);
+        
+        // Move funds back from BalanceManager to vault
+        withdraw_from_balance_manager(vault, balance_manager, amount, ctx);
     }
 
     // ======== Hot Potato Pattern ========
