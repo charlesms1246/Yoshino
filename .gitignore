@@ -4,4 +4,5 @@ prompts
 CONTEXT.md
 node_modules
 docs
+.env
 

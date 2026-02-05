@@ -1,11 +1,15 @@
 /**
  * Test Environment Setup for Yoshino Integration Tests
- * Manages localnet connection, test users, and funding
+ * Manages testnet connection, test users, and contract addresses
  */
 
+import { config } from 'dotenv';
 import { SuiClient } from '@mysten/sui/client';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { Transaction } from '@mysten/sui/transactions';
+
+// Load environment variables from .env file
+config();
 
 /**
  * Configuration for deployed contracts
@@ -29,10 +33,10 @@ export class TestEnvironment {
   users: Map<string, Ed25519Keypair>;
   contracts: DeployedContracts | null = null;
   
-  constructor(rpcUrl: string = 'http://127.0.0.1:9000') {
+  constructor(rpcUrl: string = 'https://fullnode.testnet.sui.io:443') {
     this.client = new SuiClient({ url: rpcUrl });
     this.users = new Map();
-    console.log(`🔗 Connected to Sui localnet: ${rpcUrl}`);
+    console.log(`🔗 Connected to Sui testnet: ${rpcUrl}`);
   }
   
   /**
@@ -56,16 +60,21 @@ export class TestEnvironment {
   private async createTestUsers(): Promise<void> {
     const userNames = ['alice', 'bob', 'charlie', 'dave', 'eve'];
     
+    // Use deterministic private keys so addresses are consistent across test runs
+    // These are test-only keys (32-byte seeds derived from hashing user names)
+    const { createHash } = await import('crypto');
+    
     console.log('👥 Creating test users...');
     
     for (const name of userNames) {
-      // Generate keypair
-      const keypair = new Ed25519Keypair();
+      // Generate deterministic private key from name
+      const hash = createHash('sha256').update(`yoshino-test-${name}-v1`).digest();
+      const keypair = Ed25519Keypair.fromSecretKey(hash);
       const address = keypair.getPublicKey().toSuiAddress();
       
       this.users.set(name, keypair);
       
-      // Fund account from localnet faucet
+      // Fund account from resolver if needed
       try {
         await this.fundAccount(keypair);
         console.log(`  ✅ ${name.padEnd(8)} ${address}`);
@@ -76,18 +85,50 @@ export class TestEnvironment {
   }
   
   /**
-   * Request SUI from localnet faucet
+   * Request SUI from resolver account (for testnet)
    */
   private async fundAccount(keypair: Ed25519Keypair): Promise<void> {
     const address = keypair.getPublicKey().toSuiAddress();
     
+    // Check if user already has funds
+    const coins = await this.client.getCoins({ owner: address, coinType: '0x2::sui::SUI' });
+    const balance = coins.data.reduce((sum, coin) => sum + BigInt(coin.balance), 0n);
+    
+    if (balance >= 50_000_000n) {
+      // Already has at least 0.05 SUI
+      return;
+    }
+    
+    // Fund from resolver account if RESOLVER_PRIVATE_KEY is set
+    const resolverKey = process.env.RESOLVER_PRIVATE_KEY;
+    if (!resolverKey) {
+      console.log(`  ℹ️  ${address.slice(0, 10)}... (please fund manually)`);
+      return;
+    }
+    
     try {
-      await this.client.requestSuiFromFaucet(address);
+      const { decodeSuiPrivateKey } = await import('@mysten/sui/cryptography');
+      let resolverKeypair: Ed25519Keypair;
       
-      // Wait a bit for transaction to finalize
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      throw new Error(`Failed to fund account ${address}: ${error}`);
+      if (resolverKey.startsWith('suiprivkey')) {
+        const decoded = decodeSuiPrivateKey(resolverKey);
+        resolverKeypair = Ed25519Keypair.fromSecretKey(decoded.secretKey);
+      } else {
+        resolverKeypair = Ed25519Keypair.fromSecretKey(Buffer.from(resolverKey, 'base64'));
+      }
+      
+      const tx = new Transaction();
+      const [coin] = tx.splitCoins(tx.gas, [100_000_000n]); // 0.1 SUI
+      tx.transferObjects([coin], address);
+      
+      await this.client.signAndExecuteTransaction({
+        transaction: tx,
+        signer: resolverKeypair,
+        options: { showEffects: true },
+      });
+      
+    } catch (error: any) {
+      console.log(`  ⚠️  ${address.slice(0, 10)}... funding failed: ${error.message}`);
     }
   }
   
@@ -97,10 +138,12 @@ export class TestEnvironment {
   private async loadContracts(): Promise<void> {
     console.log('\n📦 Loading contract addresses...');
     
-    // Try to load from environment variables
-    if (process.env.YOSHINO_PACKAGE_ID) {
+    // Try to load from environment variables (supporting both naming conventions)
+    const packageId = process.env.PACKAGE_ID || process.env.YOSHINO_PACKAGE_ID;
+    
+    if (packageId) {
       this.contracts = {
-        packageId: process.env.YOSHINO_PACKAGE_ID,
+        packageId,
         vaultBaseId: process.env.VAULT_BASE_ID || '',
         vaultQuoteId: process.env.VAULT_QUOTE_ID || '',
         balanceManagerId: process.env.BALANCE_MANAGER_ID || '',
@@ -110,12 +153,11 @@ export class TestEnvironment {
       };
       
       console.log(`  ✅ Package ID: ${this.contracts.packageId}`);
-      console.log(`  ✅ Vault Base: ${this.contracts.vaultBaseId}`);
-      console.log(`  ✅ Vault Quote: ${this.contracts.vaultQuoteId}`);
+      console.log(`  ✅ Yoshino State: ${process.env.YOSHINO_STATE_ID || 'N/A'}`);
       console.log(`  ✅ SolverCap: ${this.contracts.solverCapId}`);
     } else {
       console.log('  ⚠️  No contract addresses found');
-      console.log('  ℹ️  Run deploy-local.sh first and set environment variables');
+      console.log('  ℹ️  Set PACKAGE_ID environment variable');
       this.contracts = null;
     }
   }

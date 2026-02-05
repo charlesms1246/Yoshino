@@ -80,20 +80,25 @@ export async function depositToVault(
   const contracts = env.getContracts();
   const tx = new Transaction();
   
-  // Get vault ID based on coin type
-  const vaultId = coinType === '0x2::sui::SUI' 
-    ? contracts.vaultBaseId 
-    : contracts.vaultQuoteId;
+  // Get YoshinoState ID from env
+  const yoshinoStateId = process.env.YOSHINO_STATE_ID;
+  if (!yoshinoStateId) {
+    throw new Error('YOSHINO_STATE_ID not found in environment');
+  }
   
-  // Split coins for deposit
-  const coin = tx.splitCoins(tx.gas, [amount]);
+  // For SUI coinType, we can use tx.splitCoins with tx.gas
+  // Set a reasonable gas budget (20M MIST = 0.02 SUI should be enough)
+  tx.setGasBudget(20_000_000);
+  
+  // Split a coin from gas payment for deposit
+  const [depositCoin] = tx.splitCoins(tx.gas, [amount]);
   
   // Call deposit function
   tx.moveCall({
     target: `${contracts.packageId}::shielded_pool::deposit`,
     arguments: [
-      tx.object(vaultId),
-      coin,
+      tx.object(yoshinoStateId),
+      depositCoin,
     ],
     typeArguments: [coinType],
   });

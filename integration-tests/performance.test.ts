@@ -130,7 +130,7 @@ describe('Performance Tests', () => {
       const balanceBefore = await env.getBalance(aliceAddress);
       
       // Perform deposit
-      const depositAmount = parseSui(0.1);
+      const depositAmount = parseSui(0.01); // Test users have ~0.1 SUI
       await depositToVault(env, alice, depositAmount);
       
       // Get balance after

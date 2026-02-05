@@ -163,7 +163,7 @@ describe('Yoshino E2E Integration Tests', () => {
       }
       
       const bob = env.getUser('bob');
-      const depositAmount = parseSui(0.5);
+      const depositAmount = parseSui(0.01); // 0.01 SUI deposit (users have ~0.1 SUI)
       
       console.log('\n📍 Testing deposit...\n');
       
@@ -186,11 +186,11 @@ describe('Yoshino E2E Integration Tests', () => {
       console.log('\n📍 Testing withdrawal...\n');
       
       // First deposit
-      await depositToVault(env, charlie, parseSui(1.0));
+      await depositToVault(env, charlie, parseSui(0.02));
       console.log('✅ Deposit successful');
       
       // Then withdraw
-      await withdrawFromVault(env, charlie, parseSui(0.3));
+      await withdrawFromVault(env, charlie, parseSui(0.01));
       console.log('✅ Withdrawal successful');
     }, 20000);
   });
