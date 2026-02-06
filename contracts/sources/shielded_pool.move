@@ -112,7 +112,7 @@ module yoshino::shielded_pool {
         assert!(len > 0, 2); // EEmptyBatch
         
         let coin_type = type_name::get<T>();
-        let i = 0;
+        let mut i = 0;
         
         // Process each withdrawal atomically
         while (i < len) {
