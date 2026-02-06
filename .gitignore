@@ -5,4 +5,5 @@ CONTEXT.md
 node_modules
 docs
 .env
-
+scripts
+integration-tests
