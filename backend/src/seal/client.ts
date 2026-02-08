@@ -1,10 +1,14 @@
 import { CONFIG } from '../config.js';
 import { suiClient } from '../sui/client.js';
+import { SessionKey, retrieveKeyServers } from '@mysten/seal';
+import { Transaction } from '@mysten/sui/transactions';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { AesGcm256 } from '@mysten/seal';
+import { fromHEX } from '@mysten/bcs';
 
 export interface SealDecryptionRequest {
   encryptedData: string;
-  policyModule: string;
-  policyFunction: string;
+  intentId?: string; // Optional ID if we want to track it
 }
 
 export interface SealDecryptionResult {
@@ -13,72 +17,50 @@ export interface SealDecryptionResult {
 }
 
 export class SealClient {
-  private networkUrl: string;
+  private suiClientInternal: SuiClient;
   
   constructor() {
-    this.networkUrl = CONFIG.seal.networkUrl;
+    this.suiClientInternal = new SuiClient({ url: getFullnodeUrl('testnet') });
   }
   
   /**
-   * Decrypt user intent by proving SolverCap ownership
+   * Decrypt user intent using Sui Seal SDK
+   * Note: Full decryption requires the SessionKey which requires user signature
+   * For now, we'll use fallback base64 decoding until we implement full flow
    */
   async decryptIntent(request: SealDecryptionRequest): Promise<SealDecryptionResult> {
     try {
-      // Build proof of SolverCap ownership
-      const proof = await this.buildSolverCapProof();
+      console.log('🔓 Attempting to decrypt intent...');
       
-      // Request decryption from Seal Network
-      const response = await fetch(`${this.networkUrl}/decrypt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          encryptedData: request.encryptedData,
-          policy: {
-            module: request.policyModule,
-            function: request.policyFunction,
-          },
-          proof,
-        }),
-      });
+      // Try to detect if this is base64-encoded JSON (fallback) or encrypted binary
+      const encryptedData = request.encryptedData;
       
-      if (!response.ok) {
-        throw new Error(`Seal decryption failed: ${response.statusText}`);
+      // First, try base64 decode
+      try {
+        const decoded = atob(encryptedData);
+        
+        // Check if decoded data looks like JSON
+        if (decoded.startsWith('{') || decoded.startsWith('[')) {
+          // This is base64-encoded JSON (fallback mode)
+          console.log('✅ Decrypted using base64 fallback (development mode)');
+          return {
+            decryptedData: decoded,
+            timestamp: Date.now(),
+          };
+        } else {
+          // Decoded but not JSON - this is encrypted binary data
+          console.log('⚠️ Detected encrypted binary data - SessionKey decryption not implemented');
+          throw new Error('Encrypted data requires SessionKey decryption (not yet implemented)');
+        }
+      } catch (base64Error) {
+        // Not valid base64 or decoding failed
+        console.log('⚠️ Not base64 data - attempting Seal decryption');
+        throw new Error('Seal SDK decryption with SessionKey not yet implemented');
       }
-      
-      const result = await response.json() as { data: string };
-      
-      return {
-        decryptedData: result.data,
-        timestamp: Date.now(),
-      };
     } catch (error) {
       console.error('Seal decryption error:', error);
       throw new Error(`Failed to decrypt intent: ${(error as Error).message}`);
     }
-  }
-  
-  /**
-   * Build proof that we own the SolverCap
-   * Seal nodes will simulate seal_approve(SolverCap) on-chain
-   */
-  private async buildSolverCapProof() {
-    const resolverAddress = suiClient.getAddress();
-    const solverCapId = CONFIG.sui.solverCapId;
-    
-    // Verify we actually own the SolverCap
-    const solverCap = await suiClient.getSolverCap();
-    
-    if (!solverCap.data) {
-      throw new Error('SolverCap not found');
-    }
-    
-    // Build proof structure
-    return {
-      signer: resolverAddress,
-      objectId: solverCapId,
-      // Seal network will verify this object exists and is owned by signer
-      type: 'object-ownership',
-    };
   }
   
   /**

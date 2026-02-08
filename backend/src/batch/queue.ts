@@ -87,7 +87,7 @@ export class IntentQueue {
 
   /**
    * Execute batch from queue
-   * Decrypts intents and executes on-chain
+   * Decrypts intents, filters expired/invalid, and executes on-chain
    */
   private async executeBatch(): Promise<void> {
     if (this.executing || this.queue.length === 0) {
@@ -105,8 +105,29 @@ export class IntentQueue {
       const decryptedIntents = await intentDecoder.decryptBatch(batch);
       console.log(`✅ Decrypted ${decryptedIntents.length} intents`);
 
+      // Filter expired intents
+      const now = Date.now();
+      const validIntents = decryptedIntents.filter(intent => {
+        if (now > intent.expires_at) {
+          console.log(`⏱️  Intent from ${intent.user} expired at ${new Date(intent.expires_at).toISOString()}`);
+          return false;
+        }
+        return true;
+      });
+
+      if (validIntents.length === 0) {
+        console.log('⚠️  No valid intents after filtering expired');
+        return;
+      }
+
+      console.log(`✅ ${validIntents.length} valid intents after expiry filter`);
+
+      // TODO: Check limit prices against DeepBook market price
+      // For now, pass all valid intents to executor
+      // The executor will handle limit price validation
+
       // Execute on-chain
-      const result = await batchExecutor.executeBatch(decryptedIntents);
+      const result = await batchExecutor.executeBatch(validIntents);
       console.log(`✅ Batch executed: ${result.txDigest}`);
       console.log(`   Total volume: ${result.totalVolume}`);
       console.log(`   Executed at: ${new Date(result.executedAt).toISOString()}\n`);
