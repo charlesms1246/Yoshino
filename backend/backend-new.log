@@ -1,0 +1,14 @@
+⏰ Batch execution loop started (size: 10, interval: 5000ms)
+✅ Configuration loaded (some values may be placeholders)
+🚀 Resolver Agent starting on port 3000
+📍 Network: testnet
+🔑 Resolver Address: 0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1
+✅ Server listening on http://localhost:3000
+<-- POST /api/orders/sync/0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1
+🔄 Syncing orders for: 0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1
+🔄 Syncing orders for user: 0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1
+📦 Found 17 transactions for user
+✅ Created 0 orders for user
+--> POST /api/orders/sync/0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1 [32m200[0m 325ms
+<-- GET /api/orders/0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1
+--> GET /api/orders/0x1aacdc938d4ea8bd7982f53a99f143377430e46d88bb9e617396948e194fa9f1 [32m200[0m 1ms
