@@ -1,26 +1,192 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --yoshino-bg: #F6E6F4;
+  --yoshino-text: #560C51;
+  --yoshino-highlight: #E23FB9;
+  --yoshino-soft-pink: #FFF0FB;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #020617;
+  font-family: 'Georgia', serif;
+  color: var(--yoshino-text);
+}
+
+/* Button Styles */
+.btn-primary {
+  background: linear-gradient(to right, rgb(147 51 234), rgb(126 34 206));
+  color: white;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 200ms;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(to right, rgb(126 34 206), rgb(107 33 168));
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: rgb(31 41 55);
+  color: white;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 200ms;
+  border: 1px solid rgba(147, 51, 234, 0.3);
+}
+
+.btn-secondary:hover {
+  background: rgb(55 65 81);
+}
+
+.btn-outline {
+  background: transparent;
+  color: rgb(192 132 252);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 200ms;
+  border: 1px solid rgba(147, 51, 234, 0.5);
+}
+
+.btn-outline:hover {
+  background: rgba(147, 51, 234, 0.1);
+  border-color: rgb(192 132 252);
+}
+
+/* Card Styles */
+.card {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+}
+
+.card-hover {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  transition: all 300ms;
+}
+
+.card-hover:hover {
+  border-color: rgba(147, 51, 234, 0.5);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+/* Input Styles */
+.input {
+  background: rgba(17, 24, 39, 0.5);
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  color: white;
+  transition: all 200ms;
+}
+
+.input::placeholder {
+  color: rgb(107 114 128);
+}
+
+.input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(147 51 234);
+  border-color: transparent;
+}
+
+/* Badge Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-success {
+  background: rgba(34, 197, 94, 0.3);
+  color: rgb(134 239 172);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.badge-error {
+  background: rgba(239, 68, 68, 0.3);
+  color: rgb(252 165 165);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.badge-warning {
+  background: rgba(234, 179, 8, 0.3);
+  color: rgb(253 224 71);
+  border: 1px solid rgba(234, 179, 8, 0.5);
+}
+
+.badge-info {
+  background: rgba(59, 130, 246, 0.3);
+  color: rgb(147 197 253);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+/* Loading Spinner */
+.spinner {
+  animation: spin 1s linear infinite;
+  border-radius: 9999px;
+  border-width: 2px;
+  border-color: rgb(55 65 81);
+  border-top-color: rgb(147 51 234);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes subtle-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.animate-subtle-float {
+  animation: subtle-float 6s ease-in-out infinite;
+}
+
+.animate-ripple {
+  animation: ripple 2s ease-out infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(147, 51, 234, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(147, 51, 234, 0.7);
 }
