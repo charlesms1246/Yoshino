@@ -7,3 +7,9 @@ docs
 .env
 scripts
 integration-tests
+
+*.md
+*.txt
+*.sh
+output-tx.json
+*.log
