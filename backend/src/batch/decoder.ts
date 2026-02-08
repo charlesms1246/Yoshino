@@ -8,11 +8,10 @@ export class IntentDecoder {
    */
   async decryptIntent(encrypted: EncryptedIntent): Promise<UserIntent> {
     try {
-      // Decrypt using Seal
+      // Decrypt using Seal SDK
       const result = await sealClient.decryptIntent({
         encryptedData: encrypted.encryptedData,
-        policyModule: `${CONFIG.sui.packageId}::seal_policy`,
-        policyFunction: 'seal_approve',
+        intentId: undefined, // Could extract from metadata if needed
       });
       
       // Parse decrypted JSON

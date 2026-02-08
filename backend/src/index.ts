@@ -4,6 +4,10 @@ import { logger } from 'hono/logger';
 import { CONFIG, validateConfig } from './config.js';
 import { suiClient } from './sui/client.js';
 import intentsApi from './api/intents.js';
+import userDataApi from './api/user-data.js';
+import withdrawApi from './api/withdraw.js';
+import transactionsApi from './api/transactions.js';
+import ordersApi from './api/orders.js';
 
 // Validate config on startup
 validateConfig();
@@ -47,6 +51,10 @@ app.get('/status', async (c) => {
 
 // Mount API routes
 app.route('/api/intents', intentsApi);
+app.route('/api/user', userDataApi);
+app.route('/api/withdraw', withdrawApi);
+app.route('/api/transactions', transactionsApi);
+app.route('/api/orders', ordersApi);
 
 // Start server
 const port = CONFIG.resolver.port;

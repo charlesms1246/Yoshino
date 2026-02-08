@@ -7,6 +7,7 @@ export const CONFIG = {
     network: process.env.SUI_NETWORK as 'localnet' | 'testnet' | 'mainnet',
     rpcUrl: process.env.SUI_RPC_URL!,
     packageId: process.env.VAULT_BASE_PACKAGE_ID!,
+    stateId: process.env.YOSHINO_STATE_ID!,
     solverCapId: process.env.SOLVER_CAP_OBJECT_ID!,
     balanceManagerId: process.env.BALANCE_MANAGER_ID!,
     vaultBaseId: process.env.VAULT_BASE_ID!,
@@ -17,7 +18,7 @@ export const CONFIG = {
   },
   resolver: {
     privateKey: process.env.RESOLVER_PRIVATE_KEY || '',
-    port: parseInt(process.env.PORT || '3000'),
+    port: parseInt(process.env.PORT || '3001', 10),
   },
   seal: {
     networkUrl: process.env.SEAL_NETWORK_URL!,
